@@ -1,0 +1,19 @@
+beam-1.0-2x-dgx-spark
+Copyright (c) 2026 Bertholomus AI
+
+Scripts that build, serve, check and quantize an EXL3 quant of reflection/Beam-1.0-501B-A23B on two NVIDIA DGX Spark (GB10)
+nodes, ported from Diffbot's Beam EXL3 recipe (MIT, Copyright (c) 2026 Diffbot).
+
+- gb10/ and quantize/: MIT (LICENSE). gb10/build-image.sh, gb10/build-kernels.sh and gb10/serve-node.sh are ports of the
+  recipe's docker/build.sh, kernels/build.sh and serve/serve.sh. Diffbot's copyright and permission notice is reproduced in
+  THIRD_PARTY_NOTICES.md and must stay with any copy of those files.
+- gb10/exllamav3-5be8865-aarch64.patch changes ExLlamaV3 (MIT, Copyright (c) 2025 Turboderp); its notice is reproduced in
+  THIRD_PARTY_NOTICES.md.
+- third_party/vllm-exl3/: Diffbot's Beam patch for vllm-exl3 (github.com/vcruz305/vllm-exl3), AGPL-3.0-only, copied
+  unchanged with its LICENSE, NOTICE.vllm-exl3 and THIRD_PARTY_NOTICES.vllm-exl3.md. Keep those files with any copy. If you
+  serve a modified version of the patched plugin over a network, AGPL-3.0 section 13 applies.
+- No model weights are in this repository. Beam-1.0-501B-A23B and Beam-1.0-501B-A23B-DFlash2 are (c) Reflection under the
+  Apache License 2.0; our quant is published separately under the same license, with Reflection's LICENSE file.
+
+Bertholomus AI is not affiliated with or endorsed by Reflection, Diffbot, NVIDIA, the vLLM project, vcruz305, turboderp or
+AtomicChat.

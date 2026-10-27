@@ -1,0 +1,141 @@
+diff --git a/exllamav3/exllamav3_ext/avx2_target.cpp b/exllamav3/exllamav3_ext/avx2_target.cpp
+index b64c0470..af337e44 100644
+--- a/exllamav3/exllamav3_ext/avx2_target.cpp
++++ b/exllamav3/exllamav3_ext/avx2_target.cpp
+@@ -5,7 +5,8 @@ bool is_avx2_supported()
+     static bool avx2_check = false;
+     static bool avx2_supported = false;
+     if (avx2_check) return avx2_supported;
+-    #ifdef __linux__
++    #if !(defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))  // EXL3_AARCH64: no AVX/F16C on this architecture
++    #elif defined(__linux__)
+         avx2_supported = __builtin_cpu_supports("avx2");
+     #else
+         int cpuInfo[4];
+@@ -22,7 +23,8 @@ bool is_f16c_supported()
+     static bool f16c_check = false;
+     static bool f16c_supported = false;
+     if (f16c_check) return f16c_supported;
+-    #ifdef __linux__
++    #if !(defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))  // EXL3_AARCH64: no AVX/F16C on this architecture
++    #elif defined(__linux__)
+         f16c_supported = __builtin_cpu_supports("f16c");
+     #else
+         int cpuInfo[4];
+diff --git a/exllamav3/exllamav3_ext/avx512_target.cpp b/exllamav3/exllamav3_ext/avx512_target.cpp
+index 2a676f68..8add25d0 100644
+--- a/exllamav3/exllamav3_ext/avx512_target.cpp
++++ b/exllamav3/exllamav3_ext/avx512_target.cpp
+@@ -6,7 +6,9 @@ bool is_avx512_supported()
+     static bool avx512_supported = false;
+     if (avx512_check) return avx512_supported;
+ 
+-#ifdef __linux__
++#if !(defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))  // EXL3_AARCH64: no AVX-512 on this architecture
++    avx512_supported = false;
++#elif defined(__linux__)
+     // Check for AVX-512F and AVX-512BW support
+     avx512_supported = __builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw");
+ #else
+diff --git a/exllamav3/exllamav3_ext/cpu/moe_handoff.cu b/exllamav3/exllamav3_ext/cpu/moe_handoff.cu
+index 2550b1dc..c9638496 100644
+--- a/exllamav3/exllamav3_ext/cpu/moe_handoff.cu
++++ b/exllamav3/exllamav3_ext/cpu/moe_handoff.cu
+@@ -149,7 +149,9 @@ namespace {
+ 
+ inline void cpu_pause_()
+ {
+-#ifdef __linux__
++#if defined(__aarch64__) || defined(__arm__)  // EXL3_AARCH64_PAUSE
++    asm volatile("yield" ::: "memory");
++#elif defined(__linux__)
+     __builtin_ia32_pause();
+ #else
+     _mm_pause();
+diff --git a/exllamav3/exllamav3_ext/cpu/moe_mul1.cpp b/exllamav3/exllamav3_ext/cpu/moe_mul1.cpp
+index 1aa97958..afc98691 100644
+--- a/exllamav3/exllamav3_ext/cpu/moe_mul1.cpp
++++ b/exllamav3/exllamav3_ext/cpu/moe_mul1.cpp
+@@ -1,3 +1,4 @@
++#if (defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))
+ #include "moe_mul1.h"
+ #include <c10/util/Half.h>
+ #include <torch/extension.h>
+@@ -2488,3 +2489,23 @@ void exl3_moe_cpu_forward
+         static_cast<int>(num_threads)
+     );
+ }
++
++#else  // !x86: EXL3_AARCH64_STUB (GB10 port; mirrors upstream v1.6.5): CPU MoE offload kernels are AVX-only
++#include "moe_mul1.h"
++#include <torch/extension.h>
++#define NO_MOE_CPU() TORCH_CHECK(false, "CPU MoE offload (moe_mul1) is not available on this CPU architecture (x86 AVX2/AVX-512 only)")
++void exl3_moe_cpu_set_prof(bool) {}
++int64_t exl3_moe_cpu_pool_stress(int, int, int, int) { NO_MOE_CPU(); return 0; }
++void exl3_moe_cpu_stage_experts(int64_t, const uint32_t*, int, uint8_t*, int) { NO_MOE_CPU(); }
++bool exl3_moe_cpu_has_avx2() { return false; }
++bool exl3_moe_cpu_has_avx512_bw() { return false; }
++bool exl3_moe_cpu_has_avx512_vnni() { return false; }
++bool exl3_moe_cpu_has_avx512_vbmi() { return false; }
++int64_t exl3_moe_cpu_make_layer(
++    const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&,
++    const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&, const std::vector<at::Tensor>&,
++    int64_t, double, int64_t) { NO_MOE_CPU(); return 0; }
++void exl3_moe_cpu_free_layer(int64_t) {}
++void exl3_moe_cpu_forward_raw(int64_t, const at::Half*, const int32_t*, const at::Half*, float*, int, int, int) { NO_MOE_CPU(); }
++void exl3_moe_cpu_forward(int64_t, const at::Tensor&, const at::Tensor&, const at::Tensor&, at::Tensor&, int64_t) { NO_MOE_CPU(); }
++#endif
+diff --git a/exllamav3/exllamav3_ext/parallel/all_reduce_cpu.cu b/exllamav3/exllamav3_ext/parallel/all_reduce_cpu.cu
+index 5b3688f0..ccf715c9 100644
+--- a/exllamav3/exllamav3_ext/parallel/all_reduce_cpu.cu
++++ b/exllamav3/exllamav3_ext/parallel/all_reduce_cpu.cu
+@@ -109,7 +109,9 @@ void run_cpu_reduce_jobs
+                 break;
+             if (++spins < 65536)
+             {
+-                #ifdef __linux__
++                #if defined(__aarch64__) || defined(__arm__)  // EXL3_AARCH64_PAUSE
++                    asm volatile("yield" ::: "memory");
++                #elif defined(__linux__)
+                     __builtin_ia32_pause();
+                 #else
+                     _mm_pause();
+diff --git a/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx2.cpp b/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx2.cpp
+index a60daa27..fa744a78 100644
+--- a/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx2.cpp
++++ b/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx2.cpp
+@@ -1,3 +1,4 @@
++#if (defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))
+ #include <immintrin.h>
+ #include "all_reduce_cpu_avx2.h"
+ #include "all_reduce_cpu_avx512.h"
+@@ -397,3 +398,15 @@ void perform_cpu_reduce_avx2
+         chunk_idx++;
+     }
+ }
++
++#else  // !x86: EXL3_AARCH64_STUB (GB10 port; mirrors upstream v1.6.5): CPU all-reduce for the native TP backend is AVX-only
++#include "all_reduce_cpu_avx2.h"
++#include <torch/extension.h>
++void enable_fast_fp() {}
++void enable_fast_fp_avx2() {}
++void perform_cpu_reduce(PGContext*, size_t, uint32_t, uint32_t, uint8_t*, size_t)
++{ TORCH_CHECK(false, "Native tensor-parallel CPU reduce is not available on this CPU architecture (x86 AVX2 only); use the nccl backend"); }
++void perform_cpu_reduce_avx2(PGContext* c, size_t a, uint32_t b, uint32_t d, uint8_t* e, size_t f) { perform_cpu_reduce(c, a, b, d, e, f); }
++void cpu_reduce_parallel(void (*)(uint16_t*, const uint16_t*, const uint16_t*, size_t), void (*)(uint16_t*, const uint16_t*, size_t),
++                         uint16_t*, const uint16_t*, const uint16_t*, size_t, int) { TORCH_CHECK(false, "cpu_reduce_parallel unavailable on this architecture"); }
++#endif
+diff --git a/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx512.cpp b/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx512.cpp
+index 7894ec49..85af5849 100644
+--- a/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx512.cpp
++++ b/exllamav3/exllamav3_ext/parallel/all_reduce_cpu_avx512.cpp
+@@ -1,3 +1,4 @@
++#if (defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))
+ #include <immintrin.h>
+ #include "all_reduce_cpu_avx512.h"
+ #include "all_reduce_cpu_avx2.h"
+@@ -418,3 +419,4 @@ void perform_cpu_reduce_avx512
+         chunk_idx++;
+     }
+ }
++#endif  // EXL3_AARCH64_STUB (GB10 port; mirrors upstream v1.6.5)
