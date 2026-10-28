@@ -12,8 +12,11 @@ nodes, ported from Diffbot's Beam EXL3 recipe (MIT, Copyright (c) 2026 Diffbot).
 - third_party/vllm-exl3/: Diffbot's Beam patch for vllm-exl3 (github.com/vcruz305/vllm-exl3), AGPL-3.0-only, copied
   unchanged with its LICENSE, NOTICE.vllm-exl3 and THIRD_PARTY_NOTICES.vllm-exl3.md. Keep those files with any copy. If you
   serve a modified version of the patched plugin over a network, AGPL-3.0 section 13 applies.
+- tf/: MIT (LICENSE). It serves TensorFold (github.com/ashhart/TensorFold, Apache License 2.0, by ashhart and the
+  TensorFold contributors) from our fork, branch beam-1.0-tp2 of github.com/bertholomus/TensorFold, which carries
+  TensorFold's license and notices. No TensorFold code is in this repository.
 - No model weights are in this repository. Beam-1.0-501B-A23B and Beam-1.0-501B-A23B-DFlash2 are (c) Reflection under the
   Apache License 2.0; our quant is published separately under the same license, with Reflection's LICENSE file.
 
-Bertholomus AI is not affiliated with or endorsed by Reflection, Diffbot, NVIDIA, the vLLM project, vcruz305, turboderp or
-AtomicChat.
+Bertholomus AI is not affiliated with or endorsed by Reflection, Diffbot, NVIDIA, the vLLM project, vcruz305, turboderp,
+AtomicChat, ashhart or the TensorFold project.
